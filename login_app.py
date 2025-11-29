@@ -75,14 +75,19 @@ def meta_agent():
         st.session_state.messages.append({"role": "user", "content": user_input})
 
         # Prepare conversation prompt including RAG context
+        recent_messages = st.session_state.messages[-4:]
         conversation_text = ""
-        for m in st.session_state.messages[-5:]:
+        for m in recent_messages:
             if m["role"] == "user":
                 conversation_text += f"### Instruction:\n{m['content']}\n### Response:\n"
             else:
                 conversation_text += f"{m['content']}\n"
-                
-        prompt = f"Here are recent abnormal health metrics:\n{context_text}\n\nConversation:\n{conversation_text}"
+
+
+        max_entries = 5
+        truncated_context = "\n".join(context_entries[-max_entries:])
+        prompt = truncated_context + "\n\n" + conversation_text
+        # prompt = f"Here are recent abnormal health metrics:\n{context_text}\n\nConversation:\n{conversation_text}"
 
         # Generate response
         output = llm(prompt=prompt, max_tokens=200)
