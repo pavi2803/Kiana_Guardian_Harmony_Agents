@@ -43,27 +43,43 @@ def logout():
 def meta_agent():
     from llama_cpp import Llama
     import google.generativeai as genai
+    import json
+    import os
 
     llm = Llama(model_path="./models/tinyllama.gguf", n_ctx=512)
+
+    try:
+        with open("data/abnormal_metrics.json") as f:
+            abnormal_metrics = json.load(f)
+    except FileNotFoundError:
+        abnormal_metrics = []
+
+    # Combine abnormal metrics into a single context string
+    context = "\n".join(abnormal_metrics) if abnormal_metrics else "No abnormal health metrics recorded."
 
     if "messages" not in st.session_state:
         st.session_state.messages = []
 
     st.markdown("<h2 style='text-align:center;'>Meta Agent - What's on your mind?</h2>", unsafe_allow_html=True)
 
+    # Display previous messages
     for msg in st.session_state.messages:
         with st.chat_message(msg["role"]):
             st.markdown(msg["content"])
 
+
     if user_input := st.chat_input("Type your message here..."):
         st.session_state.messages.append({"role": "user", "content": user_input})
-        conversation_text = ""
+
+        # Prepare conversation prompt including RAG context
+        conversation_text = f"### Context from Health Metrics:\n{context}\n\n"
         for m in st.session_state.messages:
             if m["role"] == "user":
                 conversation_text += f"### Instruction:\n{m['content']}\n### Response:\n"
             else:
                 conversation_text += f"{m['content']}\n"
 
+        # Generate response
         output = llm(prompt=conversation_text, max_tokens=200)
         bot_reply = output['choices'][0]['text'].strip()
         st.session_state.messages.append({"role": "assistant", "content": bot_reply})
@@ -73,6 +89,7 @@ def meta_agent():
 
     if st.button("Back to Dashboard"):
         go_to_dashboard()
+
 
 # --- Dashboard Function ---
 def dashboard():

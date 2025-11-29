@@ -43,7 +43,8 @@ def send_email_alert(to_emails, subject, body):
     
     st.success(f"Email sent to Health Department Managers.")
 
-
+import os
+import json
 if st.button("Run Harmony Simulation"):
     df = pd.read_csv("health_metrics.csv")
     manager_emails = st.secrets["email"]["manager_emails"]
@@ -62,9 +63,11 @@ if st.button("Run Harmony Simulation"):
 
     if abnormal_entries:
         full_message = "Abnormal Health Metrics Detected:\n\n" + "\n".join(abnormal_entries)
-        send_email_alert(manager_emails, "Abnormal Health Alert", full_message)
+        # send_email_alert(manager_emails, "Abnormal Health Alert", full_message)
+
+        os.makedirs("data", exist_ok=True)  # make folder if it doesn't exist
+        with open("data/abnormal_metrics.json", "w") as f:
+            json.dump(abnormal_entries, f)
+
     else:
         st.info("No abnormal metrics detected.")
-
-
-
