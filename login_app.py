@@ -11,11 +11,22 @@ import os
 # --- Page config ---
 st.set_page_config(page_title="Guardian & Harmony", page_icon="🛡️", layout="centered")
 
-
 st.markdown("<h2 style='text-align:center;'> 🛡️ Guardian and Harmony</h2>", unsafe_allow_html=True)
 
 SECRET_FILE_PATH = "/etc/secrets/secret.toml"  # path where Render mounts it
-secrets = toml.load(SECRET_FILE_PATH)
+
+if not os.path.exists(SECRET_FILE_PATH):
+    st.error("Secret file missing inside container. Check Render secret mount path.")
+    st.stop()
+
+try:
+    secrets = toml.load(SECRET_FILE_PATH)
+except Exception as e:
+    st.error(f"Failed to load TOML: {e}")
+    st.stop()
+
+
+# secrets = toml.load(SECRET_FILE_PATH)
 
 # --- Initialize Firebase ---
 if not firebase_admin._apps:
