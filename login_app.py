@@ -11,7 +11,7 @@ import os
 # --- Page config ---
 st.set_page_config(page_title="Guardian & Harmony", page_icon="🛡️", layout="centered")
 
-st.markdown("<h2 style='text-align:center;'> 🛡️ Guardian and Harmony</h2>", unsafe_allow_html=True)
+
 
 SECRET_FILE_PATH = "/etc/secrets/secret.toml"  # path where Render mounts it
 
@@ -38,13 +38,13 @@ if not firebase_admin._apps:
 
 db = firestore.client()
 
-# --- Session state for page ---
-if "page" not in st.session_state:
-    st.session_state.page = "login"
+# # --- Session state for page ---
+# if "page" not in st.session_state:
+#     st.session_state.page = "login"
 
-if "logged_in" not in st.session_state:
-    st.session_state.logged_in = False
-    st.session_state.user = None
+# if "logged_in" not in st.session_state:
+#     st.session_state.logged_in = False
+#     st.session_state.user = None
 
 # --- Page Navigation Functions ---
 def go_to_dashboard():
@@ -270,15 +270,25 @@ def dashboard():
         go_to_meta_agent()
 
 # --- Login Page ---
-def login_page():
+# --- Initialize session state ---
+if "logged_in" not in st.session_state:
+    st.session_state.logged_in = False
 
-    
+if "page" not in st.session_state:
+    st.session_state.page = "login"  # default page is login
+
+# --- Login Page ---
+def login_page():
+    st.markdown("<h2 style='text-align:center;'> 🛡️ Guardian and Harmony</h2>", unsafe_allow_html=True)
     st.markdown("<h3 style='text-align:center;'>Login to your Dashboard</h3>", unsafe_allow_html=True)
+
     username = st.text_input("Username", placeholder="Enter your username")
     password = st.text_input("Password", type="password", placeholder="Enter your password")
+
     if st.button("Login"):
         users_ref = db.collection("users")
         query = users_ref.where("username", "==", username).stream()
+        user_found = False
         for doc in query:
             user = doc.to_dict()
             if user.get("password") == password:
@@ -286,13 +296,17 @@ def login_page():
                 st.session_state.user = user
                 st.session_state.page = "dashboard"
                 st.success(f"Welcome {user['First_name']} {user['Last_name']}")
-                return
-        st.error("❌ Invalid username or password")
+                user_found = True
+                break
+        if not user_found:
+            st.error("❌ Invalid username or password")
+
 
 # --- Page Router ---
-if st.session_state.page == "login":
+if st.session_state.logged_in:
+    if st.session_state.page == "dashboard":
+        dashboard()
+    elif st.session_state.page == "meta_agent":
+        meta_agent()
+else:
     login_page()
-elif st.session_state.page == "dashboard":
-    dashboard()
-elif st.session_state.page == "meta_agent":
-    meta_agent()
