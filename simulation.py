@@ -254,29 +254,70 @@ def compute_evacuation_routes(evac_df, unsafe_zones):
 df = load_guardian_data()
 
 
+# def save_guardian_routes_to_firestore(routes_df):
+#     # --- Save locally ---
+#     os.makedirs("data", exist_ok=True)
+#     local_path = "data/guardian_routes.json"
+#     routes_df.to_json(local_path, orient="records", indent=2)
+
+#     # --- Save to Firestore ---
+#     collection_ref = db.collection("guardian_routes")
+#     today_str = datetime.today().strftime("%Y-%m-%d")
+
+#     # Convert DataFrame to list of dicts for Firestore
+#     routes_list = routes_df.to_dict(orient="records")
+
+#     # Check if today's entry already exists
+#     existing = collection_ref.where("date", "==", today_str).get()
+#     if not existing:
+#         collection_ref.add({
+#             "date": today_str,
+#             "routes": routes_list
+#         })
+#         st.success("Guardian routes saved to database and locally.")
+#     else:
+#         st.info("Guardian routes for today already exist in the database.")
+
 def save_guardian_routes_to_firestore(routes_df):
+    import os
+    from datetime import datetime
+
     # --- Save locally ---
     os.makedirs("data", exist_ok=True)
     local_path = "data/guardian_routes.json"
-    routes_df.to_json(local_path, orient="records", indent=2)
+
+    # Prepare email-friendly summary
+    zone_summary = routes_df.groupby(
+        ["current_zone", "assigned_muster_zone"]
+    ).agg(avg_distance=("distance_m", "mean")).reset_index()
+
+    guardian_entries = []
+    for _, row in zone_summary.iterrows():
+        current = row["current_zone"] if pd.notna(row["current_zone"]) else "Unknown"
+        assigned = row["assigned_muster_zone"] if pd.notna(row["assigned_muster_zone"]) else "Unknown"
+        distance = f"{int(row['avg_distance'])} m" if pd.notna(row["avg_distance"]) else "unknown"
+        guardian_entries.append(f"From {current} → go to {assigned} (~{distance})")
+
+    # Save locally
+    import json
+    with open(local_path, "w") as f:
+        json.dump(guardian_entries, f, indent=2)
 
     # --- Save to Firestore ---
     collection_ref = db.collection("guardian_routes")
     today_str = datetime.today().strftime("%Y-%m-%d")
-
-    # Convert DataFrame to list of dicts for Firestore
-    routes_list = routes_df.to_dict(orient="records")
 
     # Check if today's entry already exists
     existing = collection_ref.where("date", "==", today_str).get()
     if not existing:
         collection_ref.add({
             "date": today_str,
-            "routes": routes_list
+            "routes": guardian_entries
         })
         st.success("Guardian routes saved to database and locally.")
     else:
         st.info("Guardian routes for today already exist in the database.")
+
 
 st.markdown("<h2 style='text-align:center;'>Guardian: Evacuation Routes</h2>", unsafe_allow_html=True)
     # Let user choose which zones are unsafe
