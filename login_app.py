@@ -12,7 +12,7 @@ import os
 st.set_page_config(page_title="Guardian & Harmony", page_icon="🛡️", layout="centered")
 
 # SECRET_FILE_PATH = "/etc/secrets/secret.toml"  # path where Render mounts it
-SECRET_FILE_PATH = ".streamlit/secret.toml"  # path where Render mounts it
+SECRET_FILE_PATH = ".streamlit/secrets.toml"  # path where Render mounts it
 
 if not os.path.exists(SECRET_FILE_PATH):
     st.error("Secret file missing inside container. Check Render secret mount path.")
@@ -169,20 +169,22 @@ def meta_agent():
 
     # --- Flatten entries ---
     flat_abnormal = []
-    for entry in abnormal_entries[-max_entries:]:
+    for entry in abnormal_entries[-3:]:
         if isinstance(entry, dict):
             flat_abnormal.append(", ".join(f"{k}: {v}" for k, v in entry.items()))
         else:
             flat_abnormal.append(str(entry))
 
+    # Flatten guardian routes (keep only last 3)
     flat_guardian = []
-    for entry in guardian_entries[-max_entries:]:
+    for entry in guardian_entries[-3:]:
         if isinstance(entry, dict):
-            flat_guardian.append(", ".join(f"{k}: {v}" for k, v in entry.items()))
+            # convert dict to one-line summary
+            flat_guardian.append(f"From {entry.get('origin','?')} -> {entry.get('assigned','?')} (~{entry.get('distance','?')} m)")
         else:
             flat_guardian.append(str(entry))
 
-    # --- Combine RAG context ---
+    # Combine context
     truncated_context = ""
     if flat_abnormal:
         truncated_context += "Abnormal Health Metrics:\n" + "\n".join(flat_abnormal) + "\n\n"
