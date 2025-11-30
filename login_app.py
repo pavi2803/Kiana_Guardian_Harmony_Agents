@@ -141,6 +141,8 @@ def dashboard():
 
 # --- Login Page ---
 def login_page():
+    
+    st.markdown("<h2 style='text-align:center;'> 🛡️ Guardian and Harmony</h2>", unsafe_allow_html=True)
     st.markdown("<h3 style='text-align:center;'>Login to your Dashboard</h3>", unsafe_allow_html=True)
     username = st.text_input("Username", placeholder="Enter your username")
     password = st.text_input("Password", type="password", placeholder="Enter your password")
