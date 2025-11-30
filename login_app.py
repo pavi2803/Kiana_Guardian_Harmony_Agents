@@ -1,17 +1,22 @@
-import streamlit as st
+import toml
 import firebase_admin
 from firebase_admin import credentials, firestore
 import pandas as pd
 import matplotlib.pyplot as plt
 import smtplib
 from email.mime.text import MIMEText
+import streamlit as st
+import os
 
 # --- Page config ---
 st.set_page_config(page_title="Guardian & Harmony", page_icon="🛡️", layout="centered")
 
+SECRET_FILE_PATH = "/etc/secrets/secrets.toml"  # path where Render mounts it
+secrets = toml.load(SECRET_FILE_PATH)
+
 # --- Initialize Firebase ---
 if not firebase_admin._apps:
-    f = st.secrets["firebase"]
+    f = secrets["firebase"]
     cred_dict = dict(f)
     cred_dict["private_key"] = cred_dict["private_key"].replace("\\n", "\n")
     cred = credentials.Certificate(cred_dict)
@@ -141,7 +146,7 @@ def dashboard():
 
 # --- Login Page ---
 def login_page():
-    
+
     st.markdown("<h2 style='text-align:center;'> 🛡️ Guardian and Harmony</h2>", unsafe_allow_html=True)
     st.markdown("<h3 style='text-align:center;'>Login to your Dashboard</h3>", unsafe_allow_html=True)
     username = st.text_input("Username", placeholder="Enter your username")
