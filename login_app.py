@@ -11,7 +11,7 @@ import os
 # --- Page config ---
 st.set_page_config(page_title="Guardian & Harmony", page_icon="🛡️", layout="centered")
 
-SECRET_FILE_PATH = "/etc/secrets/secrets.toml"  # path where Render mounts it
+SECRET_FILE_PATH = "/etc/secrets/secret.toml"  # path where Render mounts it
 secrets = toml.load(SECRET_FILE_PATH)
 
 # --- Initialize Firebase ---
