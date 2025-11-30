@@ -43,22 +43,31 @@ def logout():
 def meta_agent():
     from llama_cpp import Llama
     import google.generativeai as genai
-    import json
-    import os
+    import streamlit as st
+    from firebase_admin import firestore
+    from datetime import datetime, timedelta
 
     llm = Llama(model_path="./models/tinyllama.gguf", n_ctx=512)
 
+    # --- Fetch last N abnormal metrics from Firestore ---
+    db = firestore.client()
+    max_entries = 5  # number of recent abnormal entries to include
+
+    # Assume you store abnormal metrics in collection "abnormal_metrics"
+    # and each document has fields: "date" (timestamp) and "entries" (list of strings)
+    abnormal_entries = []
+
     try:
-        with open("data/abnormal_metrics.json") as f:
-            abnormal_metrics = json.load(f)
-    except FileNotFoundError:
-        abnormal_metrics = []
+        metrics_ref = db.collection("abnormal_metrics").order_by("date", direction=firestore.Query.DESCENDING).limit(max_entries).stream()
+        for doc in metrics_ref:
+            data = doc.to_dict()
+            entries = data.get("entries", [])
+            abnormal_entries.extend(entries)
+    except Exception as e:
+        st.warning(f"Could not fetch abnormal metrics from Firestore: {e}")
 
-    # Combine abnormal metrics into a single context string
-    # context = "\n".join(abnormal_metrics) if abnormal_metrics else "No abnormal health metrics recorded."
-
-    context_entries = abnormal_metrics[-10:]
-    context_text = "\n".join(context_entries)
+    # --- Prepare truncated RAG context ---
+    truncated_context = "\n".join(abnormal_entries[-max_entries:]) if abnormal_entries else "No abnormal health metrics recorded."
 
     if "messages" not in st.session_state:
         st.session_state.messages = []
@@ -69,7 +78,6 @@ def meta_agent():
     for msg in st.session_state.messages:
         with st.chat_message(msg["role"]):
             st.markdown(msg["content"])
-
 
     if user_input := st.chat_input("Type your message here..."):
         st.session_state.messages.append({"role": "user", "content": user_input})
@@ -83,11 +91,7 @@ def meta_agent():
             else:
                 conversation_text += f"{m['content']}\n"
 
-
-        max_entries = 5
-        truncated_context = "\n".join(context_entries[-max_entries:])
         prompt = truncated_context + "\n\n" + conversation_text
-        # prompt = f"Here are recent abnormal health metrics:\n{context_text}\n\nConversation:\n{conversation_text}"
 
         # Generate response
         output = llm(prompt=prompt, max_tokens=200)
@@ -99,6 +103,7 @@ def meta_agent():
 
     if st.button("Back to Dashboard"):
         go_to_dashboard()
+
 
 
 # --- Dashboard Function ---

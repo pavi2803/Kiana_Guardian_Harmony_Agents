@@ -1,44 +1,62 @@
-def meta_agent():
-    import streamlit as st
-    from llama_cpp import Llama
-    import google.generativeai as genai
+import os
+import json
+from datetime import datetime
 
-    # Load the model (use your downloaded GGUF path)
-    # llm = Llama(model_path="/Users/pavithrasenthilkumar/.cache/huggingface/hub/models--TheBloke--TinyLlama-1.1B-Chat-v1.0-GGUF/snapshots/52e7645ba7c309695bec7ac98f4f005b139cf465/tinyllama-1.1b-chat-v1.0.Q4_K_M.gguf", n_ctx=512)
-    llm = Llama(model_path="./models/tinyllama-1.1b-chat-v1.0.Q4_K_M.gguf", n_ctx=512)
+# --- Initialize Firebase ---
+if not firebase_admin._apps:
+    f = st.secrets["firebase"]
+    cred_dict = dict(f)
+    cred_dict["private_key"] = cred_dict["private_key"].replace("\\n", "\n")
+    cred = credentials.Certificate(cred_dict)
+    firebase_admin.initialize_app(cred)
 
-    # Initialize session state for chat history
-    if "messages" not in st.session_state:
-        st.session_state.messages = []
+db = firestore.client()
 
-    st.markdown("<h2 style='color:#000000; text-align:center;'> Meta Agent - What's on your mind?</h2>", unsafe_allow_html=True)
+if st.button("Run Harmony Simulation"):
+    df = pd.read_csv("health_metrics.csv")
+    manager_emails = st.secrets["email"]["manager_emails"]
 
-    # Display chat messages
-    for msg in st.session_state.messages:
-        with st.chat_message(msg["role"]):
-            st.markdown(msg["content"])
+    abnormal_entries = []
+    for _, row in df.iterrows():
+        hr = row['heart_rate_bpm']
+        temp = row['body_temperature_c']
+        o2 = row['spo2_percent']
 
-    # User input
-    if user_input := st.chat_input("Type your message here..."):
-        st.session_state.messages.append({"role": "user", "content": user_input})
+        if hr < 50 or hr > 105 or temp < 33 or temp > 40 or o2 < 92:
+            abnormal_entries.append({
+                "employee_id": row['employee_id'],
+                "employee_name": row['employee_name'],
+                "heart_rate_bpm": hr,
+                "temperature_c": temp,
+                "spo2_percent": o2,
+                "date": str(row['date'])
+            })
+
+    if abnormal_entries:
+        full_message = "Abnormal Health Metrics Detected:\n\n" + \
+                       "\n".join([f"{e['employee_name']} HR={e['heart_rate_bpm']} Temp={e['temperature_c']} O2={e['spo2_percent']}" for e in abnormal_entries])
         
-        # Prepare conversation prompt for TinyLlama
-        conversation_text = ""
-        for m in st.session_state.messages:
-            if m["role"] == "user": 
-                conversation_text += f"### Instruction:\n{m['content']}\n### Response:\n"
-            else:
-                conversation_text += f"{m['content']}\n"
+        # send_email_alert(manager_emails, "Abnormal Health Alert", full_message)
 
-        # Call model
-        output = llm(prompt=conversation_text, max_tokens=200)
-        bot_reply = output['choices'][0]['text'].strip()
+        # --- Save locally ---
+        os.makedirs("data", exist_ok=True)
+        with open("data/abnormal_metrics.json", "w") as f:
+            json.dump(abnormal_entries, f, indent=2)
 
-        # Add model reply to chat history
-        st.session_state.messages.append({"role": "assistant", "content": bot_reply})
-        
-        # Display bot reply
-        with st.chat_message("assistant"):
-            st.markdown(bot_reply)
+        # --- Save to Firestore ---
+        collection_ref = db.collection("abnormal_metrics")
+        today_str = datetime.today().strftime("%Y-%m-%d")
 
-meta_agent()
+        # Check if today's entry already exists
+        existing = collection_ref.where("date", "==", today_str).get()
+        if not existing:
+            collection_ref.add({
+                "date": today_str,
+                "entries": abnormal_entries
+            })
+            st.success("Abnormal metrics saved to database and locally.")
+        else:
+            st.info("Metrics for today already exist in the database.")
+
+    else:
+        st.info("No abnormal metrics detected.")
