@@ -11,9 +11,8 @@ import os
 # --- Page config ---
 st.set_page_config(page_title="Guardian & Harmony", page_icon="🛡️", layout="centered")
 
-
-
-SECRET_FILE_PATH = "/etc/secrets/secret.toml"  # path where Render mounts it
+# SECRET_FILE_PATH = "/etc/secrets/secret.toml"  # path where Render mounts it
+SECRET_FILE_PATH = ".streamlit/secret.toml"  # path where Render mounts it
 
 if not os.path.exists(SECRET_FILE_PATH):
     st.error("Secret file missing inside container. Check Render secret mount path.")
