@@ -11,6 +11,9 @@ import os
 # --- Page config ---
 st.set_page_config(page_title="Guardian & Harmony", page_icon="🛡️", layout="centered")
 
+
+st.markdown("<h2 style='text-align:center;'> 🛡️ Guardian and Harmony</h2>", unsafe_allow_html=True)
+
 SECRET_FILE_PATH = "/etc/secrets/secret.toml"  # path where Render mounts it
 secrets = toml.load(SECRET_FILE_PATH)
 
@@ -120,8 +123,6 @@ def meta_agent():
     if st.button("Back to Dashboard"):
         go_to_dashboard()
 
-
-
 # --- Dashboard Function ---
 def dashboard():
     @st.cache_data
@@ -132,7 +133,7 @@ def dashboard():
 
     df = load_data()
 
-    st.markdown("<h2 style='text-align:center;'>🔎 Key Metrics</h2>", unsafe_allow_html=True)
+    st.markdown("<h2 style='text-align:center;'> Key Metrics</h2>", unsafe_allow_html=True)
     employee_group = df.groupby("employee_name").mean(numeric_only=True)
     st.bar_chart(employee_group["spo2_percent"])
     st.bar_chart(employee_group["heart_rate_bpm"])
@@ -141,13 +142,32 @@ def dashboard():
     selected_employee = st.selectbox("Select an employee:", df["employee_name"].unique())
     st.dataframe(df[df["employee_name"] == selected_employee])
 
+    st.markdown("<h3 style='text-align:center;'>Health Composition Pie Chart</h3>", unsafe_allow_html=True)
+
+    # Compute averages for the selected employee
+    emp_df = df[df["employee_name"] == selected_employee]
+
+    avg_spo2 = emp_df["spo2_percent"].mean()
+    avg_sleep = emp_df["sleep_hours"].mean()
+    avg_stress = emp_df["stress_level"].mean()
+
+    # Pie chart data
+    pie_labels = ["SpO₂ %", "Sleep Hours", "Stress Level"]
+    pie_values = [avg_spo2, avg_sleep, avg_stress]
+
+    fig, ax = plt.subplots(figsize=(4, 4))
+    ax.pie(pie_values, labels=pie_labels, autopct="%1.1f%%", startangle=90)
+    ax.axis("equal")
+
+    st.pyplot(fig)
+
     if st.button("Open Meta Agent"):
         go_to_meta_agent()
 
 # --- Login Page ---
 def login_page():
 
-    st.markdown("<h2 style='text-align:center;'> 🛡️ Guardian and Harmony</h2>", unsafe_allow_html=True)
+    
     st.markdown("<h3 style='text-align:center;'>Login to your Dashboard</h3>", unsafe_allow_html=True)
     username = st.text_input("Username", placeholder="Enter your username")
     password = st.text_input("Password", type="password", placeholder="Enter your password")

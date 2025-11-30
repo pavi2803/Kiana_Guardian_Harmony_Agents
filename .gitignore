@@ -32,7 +32,7 @@ MANIFEST
 *.manifest
 *.spec
 
-
+*.csv
 *.json
 # Installer logs
 pip-log.txt
