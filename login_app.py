@@ -59,23 +59,95 @@ def logout():
     st.session_state.user = None
 
 # --- Meta Agent Function ---
+# def meta_agent():
+#     from llama_cpp import Llama
+#     import google.generativeai as genai
+#     import streamlit as st
+#     from firebase_admin import firestore
+#     from datetime import datetime, timedelta
+
+#     llm = Llama(model_path="./models/tinyllama.gguf", n_ctx=512)
+
+#     # --- Fetch last N abnormal metrics from Firestore ---
+#     db = firestore.client()
+#     max_entries = 5  # number of recent abnormal entries to include
+
+#     # Assume you store abnormal metrics in collection "abnormal_metrics"
+#     # and each document has fields: "date" (timestamp) and "entries" (list of strings)
+#     abnormal_entries = []
+
+#     try:
+#         metrics_ref = db.collection("abnormal_metrics").order_by("date", direction=firestore.Query.DESCENDING).limit(max_entries).stream()
+#         for doc in metrics_ref:
+#             data = doc.to_dict()
+#             entries = data.get("entries", [])
+#             abnormal_entries.extend(entries)
+#     except Exception as e:
+#         st.warning(f"Could not fetch abnormal metrics from Firestore: {e}")
+
+#     flat_entries = []
+
+#     for entry in abnormal_entries[-max_entries:]:
+#         if isinstance(entry, dict):
+#             # Convert dict to string
+#             flat_entries.append(", ".join(f"{k}: {v}" for k, v in entry.items()))
+#         else:
+#             flat_entries.append(str(entry))
+
+#     truncated_context = "\n".join(flat_entries) if flat_entries else "No abnormal health metrics recorded."
+
+#     # --- Prepare truncated RAG context ---
+#     # truncated_context = "\n".join(abnormal_entries[-max_entries:]) if abnormal_entries else "No abnormal health metrics recorded."
+
+#     if "messages" not in st.session_state:
+#         st.session_state.messages = []
+
+#     st.markdown("<h2 style='text-align:center;'>Meta Agent - What's on your mind?</h2>", unsafe_allow_html=True)
+
+#     # Display previous messages
+#     for msg in st.session_state.messages:
+#         with st.chat_message(msg["role"]):
+#             st.markdown(msg["content"])
+
+#     if user_input := st.chat_input("Type your message here..."):
+#         st.session_state.messages.append({"role": "user", "content": user_input})
+
+#         # Prepare conversation prompt including RAG context
+#         recent_messages = st.session_state.messages[-4:]
+#         conversation_text = ""
+#         for m in recent_messages:
+#             if m["role"] == "user":
+#                 conversation_text += f"### Instruction:\n{m['content']}\n### Response:\n"
+#             else:
+#                 conversation_text += f"{m['content']}\n"
+
+#         prompt = truncated_context + "\n\n" + conversation_text
+
+#         # Generate response
+#         output = llm(prompt=prompt, max_tokens=200)
+#         bot_reply = output['choices'][0]['text'].strip()
+#         st.session_state.messages.append({"role": "assistant", "content": bot_reply})
+
+#         with st.chat_message("assistant"):
+#             st.markdown(bot_reply)
+
+#     if st.button("Back to Dashboard"):
+#         go_to_dashboard()
+
+
 def meta_agent():
     from llama_cpp import Llama
-    import google.generativeai as genai
     import streamlit as st
     from firebase_admin import firestore
     from datetime import datetime, timedelta
 
     llm = Llama(model_path="./models/tinyllama.gguf", n_ctx=512)
 
-    # --- Fetch last N abnormal metrics from Firestore ---
     db = firestore.client()
-    max_entries = 5  # number of recent abnormal entries to include
+    max_entries = 5
 
-    # Assume you store abnormal metrics in collection "abnormal_metrics"
-    # and each document has fields: "date" (timestamp) and "entries" (list of strings)
+    # --- Fetch abnormal metrics ---
     abnormal_entries = []
-
     try:
         metrics_ref = db.collection("abnormal_metrics").order_by("date", direction=firestore.Query.DESCENDING).limit(max_entries).stream()
         for doc in metrics_ref:
@@ -83,28 +155,50 @@ def meta_agent():
             entries = data.get("entries", [])
             abnormal_entries.extend(entries)
     except Exception as e:
-        st.warning(f"Could not fetch abnormal metrics from Firestore: {e}")
+        st.warning(f"Could not fetch abnormal metrics: {e}")
 
-    flat_entries = []
+    # --- Fetch guardian evacuation routes ---
+    guardian_entries = []
+    try:
+        guardian_ref = db.collection("guardian_routes").order_by("date", direction=firestore.Query.DESCENDING).limit(max_entries).stream()
+        for doc in guardian_ref:
+            data = doc.to_dict()
+            routes = data.get("routes", [])
+            guardian_entries.extend(routes)
+    except Exception as e:
+        st.warning(f"Could not fetch Guardian routes: {e}")
 
+    # --- Flatten entries ---
+    flat_abnormal = []
     for entry in abnormal_entries[-max_entries:]:
         if isinstance(entry, dict):
-            # Convert dict to string
-            flat_entries.append(", ".join(f"{k}: {v}" for k, v in entry.items()))
+            flat_abnormal.append(", ".join(f"{k}: {v}" for k, v in entry.items()))
         else:
-            flat_entries.append(str(entry))
+            flat_abnormal.append(str(entry))
 
-    truncated_context = "\n".join(flat_entries) if flat_entries else "No abnormal health metrics recorded."
+    flat_guardian = []
+    for entry in guardian_entries[-max_entries:]:
+        if isinstance(entry, dict):
+            flat_guardian.append(", ".join(f"{k}: {v}" for k, v in entry.items()))
+        else:
+            flat_guardian.append(str(entry))
 
-    # --- Prepare truncated RAG context ---
-    # truncated_context = "\n".join(abnormal_entries[-max_entries:]) if abnormal_entries else "No abnormal health metrics recorded."
+    # --- Combine RAG context ---
+    truncated_context = ""
+    if flat_abnormal:
+        truncated_context += "Abnormal Health Metrics:\n" + "\n".join(flat_abnormal) + "\n\n"
+    if flat_guardian:
+        truncated_context += "Guardian Evacuation Routes:\n" + "\n".join(flat_guardian)
 
+    if not truncated_context:
+        truncated_context = "No relevant metrics or routes recorded."
+
+    # --- Streamlit chat interface ---
     if "messages" not in st.session_state:
         st.session_state.messages = []
 
     st.markdown("<h2 style='text-align:center;'>Meta Agent - What's on your mind?</h2>", unsafe_allow_html=True)
 
-    # Display previous messages
     for msg in st.session_state.messages:
         with st.chat_message(msg["role"]):
             st.markdown(msg["content"])
@@ -112,7 +206,6 @@ def meta_agent():
     if user_input := st.chat_input("Type your message here..."):
         st.session_state.messages.append({"role": "user", "content": user_input})
 
-        # Prepare conversation prompt including RAG context
         recent_messages = st.session_state.messages[-4:]
         conversation_text = ""
         for m in recent_messages:
@@ -122,8 +215,6 @@ def meta_agent():
                 conversation_text += f"{m['content']}\n"
 
         prompt = truncated_context + "\n\n" + conversation_text
-
-        # Generate response
         output = llm(prompt=prompt, max_tokens=200)
         bot_reply = output['choices'][0]['text'].strip()
         st.session_state.messages.append({"role": "assistant", "content": bot_reply})
@@ -133,6 +224,9 @@ def meta_agent():
 
     if st.button("Back to Dashboard"):
         go_to_dashboard()
+
+
+
 
 # --- Dashboard Function ---
 def dashboard():

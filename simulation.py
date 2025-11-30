@@ -40,7 +40,7 @@ def send_email_alert(to_emails, subject, body):
     server.quit()
 
     
-    st.success(f"Email sent to Health Department Managers")
+    
 
 st.markdown("<h2 style='text-align:center;'>Harmony Agent</h2>", unsafe_allow_html=True)
 
@@ -69,6 +69,7 @@ if st.button("Run Harmony Simulation"):
                        "\n".join([f"{e['employee_name']} HR={e['heart_rate_bpm']} Temp={e['temperature_c']} O2={e['spo2_percent']}" for e in abnormal_entries])
         
         send_email_alert(manager_emails, "Abnormal Health Alert", full_message)
+        st.success(f"Email sent to Health Department Managers")
 
         # --- Save locally ---
         os.makedirs("data", exist_ok=True)
@@ -171,6 +172,7 @@ def send_guardian_email(routes_df, unsafe_zones):
         subject=subject,
         body=body,
     )
+    st.success(f"Evacuation Plan - Optimal Routes Info Sent")
 
 
 def compute_evacuation_routes(evac_df, unsafe_zones):
@@ -251,6 +253,31 @@ def compute_evacuation_routes(evac_df, unsafe_zones):
 
 df = load_guardian_data()
 
+
+def save_guardian_routes_to_firestore(routes_df):
+    # --- Save locally ---
+    os.makedirs("data", exist_ok=True)
+    local_path = "data/guardian_routes.json"
+    routes_df.to_json(local_path, orient="records", indent=2)
+
+    # --- Save to Firestore ---
+    collection_ref = db.collection("guardian_routes")
+    today_str = datetime.today().strftime("%Y-%m-%d")
+
+    # Convert DataFrame to list of dicts for Firestore
+    routes_list = routes_df.to_dict(orient="records")
+
+    # Check if today's entry already exists
+    existing = collection_ref.where("date", "==", today_str).get()
+    if not existing:
+        collection_ref.add({
+            "date": today_str,
+            "routes": routes_list
+        })
+        st.success("Guardian routes saved to database and locally.")
+    else:
+        st.info("Guardian routes for today already exist in the database.")
+
 st.markdown("<h2 style='text-align:center;'>Guardian: Evacuation Routes</h2>", unsafe_allow_html=True)
     # Let user choose which zones are unsafe
 all_zones = sorted(df["zone_name"].dropna().unique())
@@ -268,6 +295,8 @@ if st.button("Run Guardian Simulation"):
             # --- Save full routes locally (optional) ---
             os.makedirs("data", exist_ok=True)
             evac_routes.to_csv("data/evacuation_routes.csv", index=False)
+
+            save_guardian_routes_to_firestore(evac_routes)
 
             # --- Send zone-level email summary only ---
             send_guardian_email(evac_routes, unsafe_zones)
