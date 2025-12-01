@@ -134,21 +134,113 @@ def logout():
 #         go_to_dashboard()
 
 
+# def meta_agent():
+#     from llama_cpp import Llama
+#     import streamlit as st
+#     from firebase_admin import firestore
+#     from datetime import datetime, timedelta
+
+#     llm = Llama(model_path="./models/tinyllama.gguf", n_ctx=512)
+
+#     db = firestore.client()
+#     max_entries = 5
+
+#     # --- Fetch abnormal metrics ---
+#     abnormal_entries = []
+#     try:
+#         metrics_ref = db.collection("abnormal_metrics").order_by("date", direction=firestore.Query.DESCENDING).limit(max_entries).stream()
+#         for doc in metrics_ref:
+#             data = doc.to_dict()
+#             entries = data.get("entries", [])
+#             abnormal_entries.extend(entries)
+#     except Exception as e:
+#         st.warning(f"Could not fetch abnormal metrics: {e}")
+
+#     # --- Fetch guardian evacuation routes ---
+#     guardian_entries = []
+#     try:
+#         guardian_ref = db.collection("guardian_routes").order_by("date", direction=firestore.Query.DESCENDING).limit(max_entries).stream()
+#         for doc in guardian_ref:
+#             data = doc.to_dict()
+#             routes = data.get("routes", [])
+#             guardian_entries.extend(routes)
+#     except Exception as e:
+#         st.warning(f"Could not fetch Guardian routes: {e}")
+
+#     # --- Flatten entries ---
+#     flat_abnormal = []
+#     for entry in abnormal_entries[-3:]:
+#         if isinstance(entry, dict):
+#             flat_abnormal.append(", ".join(f"{k}: {v}" for k, v in entry.items()))
+#         else:
+#             flat_abnormal.append(str(entry))
+
+#     # Flatten guardian routes (keep only last 3)
+#     flat_guardian = []
+#     for entry in guardian_entries[-3:]:
+#         if isinstance(entry, dict):
+#             # convert dict to one-line summary
+#             flat_guardian.append(f"From {entry.get('origin','?')} -> {entry.get('assigned','?')} (~{entry.get('distance','?')} m)")
+#         else:
+#             flat_guardian.append(str(entry))
+
+#     # Combine context
+#     truncated_context = ""
+#     if flat_abnormal:
+#         truncated_context += "Abnormal Health Metrics:\n" + "\n".join(flat_abnormal) + "\n\n"
+#     if flat_guardian:
+#         truncated_context += "Guardian Evacuation Routes:\n" + "\n".join(flat_guardian)
+
+#     if not truncated_context:
+#         truncated_context = "No relevant metrics or routes recorded."
+
+#     # --- Streamlit chat interface ---
+#     if "messages" not in st.session_state:
+#         st.session_state.messages = []
+
+#     st.markdown("<h2 style='text-align:center;'>Meta Agent - What's on your mind?</h2>", unsafe_allow_html=True)
+
+#     for msg in st.session_state.messages:
+#         with st.chat_message(msg["role"]):
+#             st.markdown(msg["content"])
+
+#     if user_input := st.chat_input("Type your message here..."):
+#         st.session_state.messages.append({"role": "user", "content": user_input})
+
+#         recent_messages = st.session_state.messages[-4:]
+#         conversation_text = ""
+#         for m in recent_messages:
+#             if m["role"] == "user":
+#                 conversation_text += f"### Instruction:\n{m['content']}\n### Response:\n"
+#             else:
+#                 conversation_text += f"{m['content']}\n"
+
+#         prompt = truncated_context + "\n\n" + conversation_text
+#         output = llm(prompt=prompt, max_tokens=200)
+#         bot_reply = output['choices'][0]['text'].strip()
+#         st.session_state.messages.append({"role": "assistant", "content": bot_reply})
+
+#         with st.chat_message("assistant"):
+#             st.markdown(bot_reply)
+
+#     if st.button("Back to Dashboard"):
+#         go_to_dashboard()
+
 def meta_agent():
     from llama_cpp import Llama
     import streamlit as st
     from firebase_admin import firestore
-    from datetime import datetime, timedelta
 
     llm = Llama(model_path="./models/tinyllama.gguf", n_ctx=512)
-
     db = firestore.client()
     max_entries = 5
 
     # --- Fetch abnormal metrics ---
     abnormal_entries = []
     try:
-        metrics_ref = db.collection("abnormal_metrics").order_by("date", direction=firestore.Query.DESCENDING).limit(max_entries).stream()
+        metrics_ref = db.collection("abnormal_metrics").order_by(
+            "date", direction=firestore.Query.DESCENDING
+        ).limit(max_entries).stream()
         for doc in metrics_ref:
             data = doc.to_dict()
             entries = data.get("entries", [])
@@ -159,7 +251,9 @@ def meta_agent():
     # --- Fetch guardian evacuation routes ---
     guardian_entries = []
     try:
-        guardian_ref = db.collection("guardian_routes").order_by("date", direction=firestore.Query.DESCENDING).limit(max_entries).stream()
+        guardian_ref = db.collection("guardian_routes").order_by(
+            "date", direction=firestore.Query.DESCENDING
+        ).limit(max_entries).stream()
         for doc in guardian_ref:
             data = doc.to_dict()
             routes = data.get("routes", [])
@@ -175,22 +269,21 @@ def meta_agent():
         else:
             flat_abnormal.append(str(entry))
 
-    # Flatten guardian routes (keep only last 3)
     flat_guardian = []
     for entry in guardian_entries[-3:]:
         if isinstance(entry, dict):
-            # convert dict to one-line summary
-            flat_guardian.append(f"From {entry.get('origin','?')} -> {entry.get('assigned','?')} (~{entry.get('distance','?')} m)")
+            flat_guardian.append(
+                f"From {entry.get('origin','?')} -> {entry.get('assigned','?')} (~{entry.get('distance','?')} m)"
+            )
         else:
             flat_guardian.append(str(entry))
 
-    # Combine context
+    # --- Combine context ---
     truncated_context = ""
     if flat_abnormal:
         truncated_context += "Abnormal Health Metrics:\n" + "\n".join(flat_abnormal) + "\n\n"
     if flat_guardian:
         truncated_context += "Guardian Evacuation Routes:\n" + "\n".join(flat_guardian)
-
     if not truncated_context:
         truncated_context = "No relevant metrics or routes recorded."
 
@@ -207,15 +300,18 @@ def meta_agent():
     if user_input := st.chat_input("Type your message here..."):
         st.session_state.messages.append({"role": "user", "content": user_input})
 
-        recent_messages = st.session_state.messages[-4:]
+        # --- Prepare safe prompt ---
+        max_context_chars = 1500  # approximate safe limit for 512 tokens
+        recent_messages = st.session_state.messages[-2:]  # keep last 2 messages only
         conversation_text = ""
         for m in recent_messages:
             if m["role"] == "user":
-                conversation_text += f"### Instruction:\n{m['content']}\n### Response:\n"
-            else:
-                conversation_text += f"{m['content']}\n"
+                conversation_text += m["content"].strip() + "\n"
 
         prompt = truncated_context + "\n\n" + conversation_text
+        prompt = prompt[-max_context_chars:]  # truncate to avoid overflow
+
+        # --- Get model response ---
         output = llm(prompt=prompt, max_tokens=200)
         bot_reply = output['choices'][0]['text'].strip()
         st.session_state.messages.append({"role": "assistant", "content": bot_reply})
@@ -225,8 +321,6 @@ def meta_agent():
 
     if st.button("Back to Dashboard"):
         go_to_dashboard()
-
-
 
 
 # --- Dashboard Function ---
